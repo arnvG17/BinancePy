@@ -1,9 +1,25 @@
 from flask import Flask, request, render_template_string, jsonify
+import os
 from bot.client import get_client
 from bot.orders import place_order
 from bot.validators import validate_inputs
 
 app = Flask(__name__)
+
+def get_trading_pairs():
+    """Get available trading pairs from Binance futures"""
+    try:
+        client = get_client()
+        exchange_info = client.futures_exchange_info()
+        symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
+        # Filter for USDT pairs and sort them
+        usdt_pairs = sorted([s for s in symbols if s.endswith('USDT')])
+        return usdt_pairs
+    except Exception as e:
+        print(f"Error fetching trading pairs from Binance: {e}")
+        print("Using fallback trading pairs...")
+        # Return common pairs as fallback
+        return ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT', 'LINKUSDT']
 
 HTML = """
 <!DOCTYPE html>
@@ -13,7 +29,7 @@ HTML = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Binance Trading Bot</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+        @import url('https: //fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
         
         * {
             margin: 0;
@@ -186,7 +202,7 @@ HTML = """
 <body>
     <div class="container">
         <div class="header">
-            <h1>Trading Bot UI</h1>
+            <h1>Binance Trading Bot UI</h1>
             <p>Binance Testnet Trading Interface</p>
         </div>
         
@@ -194,7 +210,12 @@ HTML = """
             <form method="post" id="orderForm">
                 <div class="form-group">
                     <label for="symbol">Trading Pair</label>
-                    <input type="text" id="symbol" name="symbol" placeholder="BTCUSDT" required>
+                    <select id="symbol" name="symbol" required>
+                        <option value="">Select a trading pair</option>
+                        {% for pair in trading_pairs %}
+                        <option value="{{ pair }}">{{ pair }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 
                 <div class="form-row">
@@ -271,6 +292,7 @@ HTML = """
 @app.route("/", methods=["GET", "POST"])
 def home():
     result = None
+    trading_pairs = get_trading_pairs()
 
     if request.method == "POST":
         try:
@@ -317,7 +339,7 @@ def home():
                 "content": str(e)
             }
 
-    return render_template_string(HTML, result=result)
+    return render_template_string(HTML, result=result, trading_pairs=trading_pairs)
 
 @app.route("/api/account")
 def account_info():
@@ -337,4 +359,4 @@ def account_info():
         })
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
